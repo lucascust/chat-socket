@@ -1,0 +1,3 @@
+C:/Users/lucas/OneDrive/Documentos/GitHub/chat-socket/build/CMakeFiles/chat_distribuido.dir
+C:/Users/lucas/OneDrive/Documentos/GitHub/chat-socket/build/CMakeFiles/ALL_BUILD.dir
+C:/Users/lucas/OneDrive/Documentos/GitHub/chat-socket/build/CMakeFiles/ZERO_CHECK.dir

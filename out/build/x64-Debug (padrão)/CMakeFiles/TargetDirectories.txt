@@ -1,3 +1,0 @@
-C:/Users/lucas/OneDrive/Documentos/GitHub/chat-socket/out/build/x64-Debug (padrão)/CMakeFiles/chat_distribuido.dir
-C:/Users/lucas/OneDrive/Documentos/GitHub/chat-socket/out/build/x64-Debug (padrão)/CMakeFiles/edit_cache.dir
-C:/Users/lucas/OneDrive/Documentos/GitHub/chat-socket/out/build/x64-Debug (padrão)/CMakeFiles/rebuild_cache.dir
