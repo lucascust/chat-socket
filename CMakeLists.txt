@@ -20,4 +20,5 @@ file(GLOB_RECURSE
      ./include/*/*.hpp
 		 ./include/*/*.hh)
 		 
-add_executable(${EXECUTABLE_NAME} ${SW_SRCS} ${SW_HDRS})
+add_executable("client" "./src/client.cpp")
+add_executable("server" "./src/server.cpp")
