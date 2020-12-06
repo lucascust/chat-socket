@@ -206,11 +206,6 @@ int main()
     }
 
 
-    // Passa a aguardar novos sockets
-    listen(master, MAX_CLIENTS);
-
-    cout << "Aguardando Usuarios..." << endl;
-
     // Inicializa lista de clientes
     for (int i = 0; i < MAX_CLIENTS; i++)
     {
@@ -219,6 +214,12 @@ int main()
     }
 
     addrlen = sizeof(struct sockaddr_in);
+
+    // Passa a aguardar novos sockets
+    listen(master, MAX_CLIENTS);
+
+    cout << "Aguardando Usuarios..." << endl;
+
 
     // Loop principal, recebe sockets e cria uma thread nova para lidar com eles
     while (1)

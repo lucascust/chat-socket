@@ -47,15 +47,13 @@ int main(int argc, char *argv[])
 	struct sockaddr_in server;
 	string message, username;
 
-	cout << "Inicializando Winsock" << endl;
+	cout << "Inicializando Winsock..." << endl;
 	
 	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
 	{
 		printf("Erro na inicialização. Código de Erro : %d", WSAGetLastError());
 		return 1;
 	}
-
-	cout << "Incializado." << endl;
 
 	// Cria socket
 	if ((client_socket = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET)
