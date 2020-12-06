@@ -7,6 +7,8 @@
 #include <thread>
 #include <vector>
 #include <map>
+#include <chrono>
+#include <ctime>
 
 #pragma comment(lib, "Ws2_32.lib")
 
@@ -19,27 +21,31 @@ using namespace std;
 class Client
 {
 public:
+    // id se comporta como incrementador
     int id;
     SOCKET socket;
     string name;
+
     Client(int id, SOCKET socket, string name): id(id), socket(socket), name(name) {};
     ~Client();
 };
 
 
+
 const char OPTION_VALUE = 1;
 const int MAX_CLIENTS = 5;
-
 
 mutex client_array_mutex;
 Client *client_array[MAX_CLIENTS];
 thread clients_thread[MAX_CLIENTS];
 map<SOCKET, thread> handle_clients;
 
+
+
+// Envia mensagem para todos os clientes conectados, exceto o que enviou
+// *client -> Ponteiro para o cliente que enviou
 void broadcastMessage(Client *client, string message)
 {
-
-
     for (int i = 0; i < MAX_CLIENTS; i++)
     {
         if (client_array[i]->socket != INVALID_SOCKET)
@@ -48,17 +54,23 @@ void broadcastMessage(Client *client, string message)
     }
 }
 
-int process_client(Client *client)
+
+string getTime(){
+    time_t now = chrono::system_clock::to_time_t(chrono::system_clock::now());
+
+    string s(30, '\0');
+    strftime(&s[0], s.size(), "%Y-%m-%d %H:%M:%S", localtime(&now));
+    return s;
+}
+
+int client_session(Client *client)
 {
     string message = "";
     char buffer[BUFFER_SIZE] = {0};
-    cout << "BBB1" << endl;
-    //Session
+    
     while (1)
     {
-        // Limpa a mensagem temporária substituindo por zeros
-        // cout << "bb1" << client->socket << endl;
-
+        // Recebe mensagem, printa e envia para demais clientes
         if (client->socket != INVALID_SOCKET)
         {
             int data_received = recv(client->socket, buffer, BUFFER_SIZE, 0);
@@ -68,34 +80,39 @@ int process_client(Client *client)
 
                 message = client->name + ": " + string(buffer);
 
-                cout << message.c_str() << endl;
-                // trava
-                //Broadcast that message to the other clients
+                cout << getTime() << endl;
+                cout << message << endl;
+
                 broadcastMessage(client, message);
             }
+            // Caso receba socket error, remove sockets e o cliente do array
             else
-            {
-                message = client->name + " Disconnected";
-
+            {   
+                message = client->name + " desconectado";
                 cout << message << endl;
+
+                // região crítica           
                 client_array_mutex.lock();
+                
                 closesocket(client->socket);
                 closesocket(client_array[client->id]->socket);
                 client_array[client->id]->socket = INVALID_SOCKET;
+                
                 client_array_mutex.unlock();
-                //Broadcast the disconnection message to the other clients
+
+                //Envia a mensagem de deconexão para demais clientes
                 broadcastMessage(client, message);
 
                 break;
             }
         }
-    } //end while
-
+    }
     (clients_thread[client->id]).detach();
 
     return 0;
 }
 
+// Lida com o client no momento da conexão                
 int handle_client(SOCKET client_socket)
 {
     char buffer[BUFFER_SIZE] = {0};
@@ -111,42 +128,39 @@ int handle_client(SOCKET client_socket)
     string username = buffer;
 
     client_array_mutex.lock();
-
+    // Procura primeiro espaço no array de clientes e insere o novo cliente
     for (int i = 0; i < MAX_CLIENTS; i++)
     {
         if (client_array[i]->socket == INVALID_SOCKET)
         {
             client_array[i]->socket = client_socket;
-            // printf("Adding to list of sockets at index %d \n", i);
-            
             client_array[i]->id = i;
-            cout << "alo 1" << endl;
             client_array[i]->name = username;
-            // username.cop
-            cout << "alo" << endl;
             
             is_inserted = true;
+            
+            printf("Cliente adicionado, id: %d \n", i);
+            // new_cliente criado para uso posterior dos valores do cliente
             new_client = client_array[i];
             break;
         }
-    } // new, malloc
-
+    }
     client_array_mutex.unlock();
+    
     if (is_inserted)
     {
-        cout << username << " Entrou na sala." << endl;
-        message = username + " Entrou na sala.";
+        message = username + " se juntou à sala.";
+        cout << message << endl;
         broadcastMessage(new_client, message);
-        cout << "b4" << endl;
-        clients_thread[new_client->id] = thread(process_client, new_client);
-        cout << "b5" << endl;
+        // Cria thread para o cliente
+        clients_thread[new_client->id] = thread(client_session, new_client);
     }
+    // Único caso para não ser inserido, é o servidor estar cheio
     else
     {
-        cout << "b6" << endl;
-        message = "Servidor está cheio.";
+        message = "O servidor está cheio.";
+        // Retorna apenas para o cliente que tentou entrar
         send(client_socket, message.c_str(), BUFFER_SIZE, 0);
-        cout << "b7" << endl;
         cout << message << endl;
     }
     (handle_clients[client_socket]).detach();
@@ -155,50 +169,49 @@ int handle_client(SOCKET client_socket)
 
 int main()
 {
-    setlocale(LC_ALL, "Portuguese");
+    setlocale(LC_ALL, "pt_BR.UTF-8");
 
     WSADATA wsaData;
     struct sockaddr_in server, address;
     SOCKET master;
-    string message = "";
+    string message = "", username;
     int num_clients = 0, addrlen;
 
     char buffer[BUFFER_SIZE] = {0};
     // buffer =  (char*) malloc((BUFFER_SIZE + 1) * sizeof(char));
 
-    //Initialize Winsock
+
     cout << "Inicializando o Winsock..." << endl;
     WSAStartup(MAKEWORD(2, 2), &wsaData);
 
-    //Create a socket
+
+    // Cria socket principal
     if ((master = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET)
     {
-        printf("Could not create socket : %d", WSAGetLastError());
+        printf("Socket não pode ser criado: %d", WSAGetLastError());
         exit(EXIT_FAILURE);
     }
 
-    cout << "Criando Socket..." << endl;
-
-    //Prepare the sockaddr_in structure
+    // Prepara a estrutura sockaddr_in
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = INADDR_ANY;
     server.sin_port = htons(PORT);
 
-    //Bind
+    cout << "Conectando à porta " << PORT << "..." << endl;
+    // Conecta o socket à porta
     if (bind(master, (struct sockaddr *)&server, sizeof(server)) == SOCKET_ERROR)
     {
-        printf("Bind failed with error code : %d", WSAGetLastError());
+        printf("Bind falhou: %d", WSAGetLastError());
         exit(EXIT_FAILURE);
     }
 
-    cout << "Conectado a porta " << PORT << "..." << endl;
 
-    //Listen to new_socket connections
+    // Passa a aguardar novos sockets
     listen(master, MAX_CLIENTS);
 
     cout << "Aguardando Usuarios..." << endl;
 
-    //Initialize the client list
+    // Inicializa lista de clientes
     for (int i = 0; i < MAX_CLIENTS; i++)
     {
         // Client temp = 
@@ -207,32 +220,33 @@ int main()
 
     addrlen = sizeof(struct sockaddr_in);
 
-    string username;
+    // Loop principal, recebe sockets e cria uma thread nova para lidar com eles
     while (1)
     {
         bool is_inserted = false;
         SOCKET new_socket = INVALID_SOCKET;
+
         new_socket = accept(master, (struct sockaddr *)&address, (int *)&addrlen);
+        
         if (new_socket != INVALID_SOCKET)
         {
-            cout << "antes da thread " << new_socket << endl;
             handle_clients[new_socket] = thread(handle_client, new_socket);
         }
 
-    } //end while
+    }
 
-    //Close listening socket
     closesocket(master);
 
-    //Close client socket
+    // Finaliza todos os sockets e threads dos clientes 
     for (int i = 0; i < MAX_CLIENTS; i++)
     {
         clients_thread[i].detach();
         closesocket(client_array[i]->socket);
     }
-
-    system("pause");
-    //Clean up Winsock
+    
     WSACleanup();
-    cout << "Program has ended successfully" << endl;
+    
+    cout << "Servidor finalizado." << endl;
+    
+    system("pause");
 }
